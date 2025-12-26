@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Médiapolygon 2040: Mission Control</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome (Replacement for Lucide Icons in standalone file) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #050505; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #00FF41; }
+        
+        body {
+            background-color: #000;
+            margin: 0;
+            overflow: hidden;
+        }
+        
+        .animate-blink {
+            animation: blink 1s step-end infinite;
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- ICON COMPONENT WRAPPER (Mapping Lucide props to FontAwesome) ---
+        // This ensures the code remains compatible with the previous React logic
+        const Icon = ({ name, size = 24, className = "" }) => {
+            const sizeStyle = { fontSize: size + 'px', width: size + 'px', height: size + 'px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
+            const map = {
+                'Terminal': 'fa-terminal',
+                'Cpu': 'fa-microchip',
+                'Users': 'fa-users',
+                'Globe': 'fa-globe',
+                'Radio': 'fa-satellite-dish',
+                'Share2': 'fa-share-alt',
+                'ShieldAlert': 'fa-shield-halved',
+                'Copy': 'fa-copy',
+                'CheckCircle': 'fa-circle-check',
+                'Code': 'fa-code',
+                'Zap': 'fa-bolt',
+                'Layers': 'fa-layer-group',
+                'AlertTriangle': 'fa-triangle-exclamation',
+                'Hammer': 'fa-hammer',
+                'Search': 'fa-magnifying-glass',
+                'Sword': 'fa-shield-virus', // Using shield-virus for battle/defense metaphor or fa-khanda
+                'Crown': 'fa-crown',
+                'Play': 'fa-play',
+                'RefreshCw': 'fa-rotate',
+                'MessageSquare': 'fa-message',
+                'ChevronRight': 'fa-chevron-right',
+                'ChevronLeft': 'fa-chevron-left'
+            };
+            return <i className={`fa-solid ${map[name] || 'fa-question'} ${className}`} style={sizeStyle}></i>;
+        };
+
+        // --- SUB-COMPONENT: GEMINI TERMINAL SIMULATOR ---
+        const GeminiTerminal = ({ type, faction }) => {
+            const [status, setStatus] = useState('IDLE'); // IDLE, PROCESSING, DONE
+            const [output, setOutput] = useState('');
+            
+            const scenarios = {
+                // 11.1 R&D
+                'brainstorm_blue': {
+                    input: 'Роль: UX-архитектор. Задача: Структура лендинга для медиа "Neon Tymen".',
+                    process: ['> АНАЛИЗ КОНТЕКСТА...', '> ГЕНЕРАЦИЯ СТРУКТУРЫ...', '> НАПИСАНИЕ TEASER-ТЕКСТОВ...'],
+                    result: `1. HERO BLOCK: "Тюмень 2040: Мы видим будущее."\n2. NEWS GRID: Сетка последних сигналов.\n3. MANIFESTO: "Технологии ради людей".\n4. TEAM: Аватары оперативников.\n\nРЕКОМЕНДАЦИЯ: Использовать CSS Grid для блока новостей.`
+                },
+                'brainstorm_red': {
+                    input: 'Роль: Инженер R&D. Задача: 5 идей инструментов против фейков.',
+                    process: ['> СКАН ВЕКТОРОВ АТАКИ...', '> ПОИСК ТЕХНОЛОГИЙ...', '> СИНТЕЗ РЕШЕНИЙ...'],
+                    result: `1. DEEPFAKE DETECTOR: Анализ артефактов на видео.\n2. TEXT SENTIMENT: Поиск эмоциональных манипуляций.\n3. SOURCE TRACER: Поиск первоисточника цитаты.\n4. IMAGE HASH: Сверка с базой фейков.\n5. BOT CHECKER: Анализ профиля в соцсетях.`
+                },
+                // 11.2 CODING
+                'debug': {
+                    input: 'ERROR: Uncaught TypeError: Cannot read property "style" of null at main.js:15',
+                    process: ['> ЧТЕНИЕ СТЕКА ОШИБКИ...', '> АНАЛИЗ DOM-ДЕРЕВА...', '> ПОИСК РЕШЕНИЯ...'],
+                    result: `ДИАГНОЗ: Скрипт пытается найти элемент, которого еще нет на странице.\nРЕШЕНИЕ:\n1. Перенесите <script> в конец <body>.\n2. Или оберните код в document.addEventListener('DOMContentLoaded').`
+                },
+                // 11.3 BATTLE
+                'critique': {
+                    input: 'Генерация каверзного вопроса для оппонентов.',
+                    process: ['> АНАЛИЗ УЯЗВИМОСТЕЙ...', '> ГЕНЕРАЦИЯ АТАКИ...', '> ФОРМУЛИРОВКА ВОПРОСА...'],
+                    result: [
+                        "ВОПРОС: Как ваш продукт защищен от взлома и подмены данных?",
+                        "ВОПРОС: Что будет, если API нейросети станет платным? Ваш проект умрет?",
+                        "ВОПРОС: Как вы проверяете достоверность данных, на которых учится ваш алгоритм?"
+                    ]
+                }
+            };
+
+            const currentScenario = scenarios[type === 'faction' ? `brainstorm_${faction}` : type];
+
+            const runSimulation = () => {
+                setStatus('PROCESSING');
+                let step = 0;
+                const interval = setInterval(() => {
+                    if (step < currentScenario.process.length) {
+                        setOutput(prev => prev + currentScenario.process[step] + '\n');
+                        step++;
+                    } else {
+                        clearInterval(interval);
+                        const res = Array.isArray(currentScenario.result) 
+                            ? currentScenario.result[Math.floor(Math.random() * currentScenario.result.length)]
+                            : currentScenario.result;
+                        setOutput(prev => prev + '\n>>> ' + res);
+                        setStatus('DONE');
+                    }
+                }, 800);
+            };
+
+            return (
+                <div className="w-full bg-black border border-cyan-500/50 rounded-lg p-4 font-mono text-sm shadow-[0_0_15px_rgba(0,243,255,0.1)] mt-4">
+                    <div className="flex justify-between items-center border-b border-gray-700 pb-2 mb-2">
+                        <div className="flex items-center gap-2 text-cyan-400">
+                            <Icon name="Cpu" size={16} /> <span>GEMINI_CORE_V.40</span>
+                        </div>
+                        <div className={`text-xs ${status === 'PROCESSING' ? 'animate-pulse text-yellow-400' : 'text-gray-500'}`}>
+                            STATUS: {status}
+                        </div>
+                    </div>
+                    
+                    <div className="text-gray-400 mb-4 border-l-2 border-gray-600 pl-2">
+                        INPUT: <span className="text-white italic">{currentScenario?.input || 'Ready...'}</span>
+                    </div>
+
+                    <div className="min-h-[120px] whitespace-pre-wrap text-green-400 mb-4">
+                        {output}
+                    </div>
+
+                    <button 
+                        onClick={runSimulation}
+                        disabled={status === 'PROCESSING'}
+                        className="w-full bg-cyan-900/30 hover:bg-cyan-900/50 border border-cyan-500 text-cyan-400 py-2 rounded flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {status === 'PROCESSING' ? <Icon name="RefreshCw" size={16} className="animate-spin"/> : <Icon name="Play" size={16}/>}
+                        <span className="ml-2">{status === 'IDLE' ? 'ЗАПУСТИТЬ СИМУЛЯЦИЮ' : status === 'PROCESSING' ? 'ВЫЧИСЛЕНИЕ...' : 'СГЕНЕРИРОВАТЬ СНОВА'}</span>
+                    </button>
+                </div>
+            );
+        };
+
+        // --- MAIN APP COMPONENT ---
+        const CyberMegaPresentation = () => {
+            const [currentSlide, setCurrentSlide] = useState(0);
+            const [glitch, setGlitch] = useState(false);
+            const [typedText, setTypedText] = useState('');
+            const [activeFaction, setActiveFaction] = useState('blue'); 
+
+            const slides = [
+                // 0. GLOBAL INTRO
+                {
+                    id: 0,
+                    type: 'title',
+                    title: 'ПРОТОКОЛ "ПРОТИВОСТОЯНИЕ"',
+                    subtitle: 'ПОЛНЫЙ ЦИКЛ РАЗРАБОТКИ (3 ЗАНЯТИЯ)',
+                    details: ['11.1: ПРОЕКТИРОВАНИЕ', '11.2: КОМПИЛЯЦИЯ', '11.3: ВЕРДИКТ'],
+                    icon: 'Layers'
+                },
+                // --- SESSION 1 ---
+                {
+                    id: 1,
+                    type: 'section_header',
+                    session: 'ЗАНЯТИЕ 1 (90 МИН)',
+                    title: 'ПРОТОКОЛ R&D',
+                    desc: 'АРХИТЕКТУРА И ИССЛЕДОВАНИЕ',
+                    color: 'text-yellow-400'
+                },
+                {
+                    id: 2,
+                    type: 'content',
+                    header: 'ВХОДЯЩАЯ ТРАНСЛЯЦИЯ',
+                    subHeader: 'РАЗДЕЛЕНИЕ НА ФРАКЦИИ',
+                    content: (
+                        <div className="space-y-6">
+                            <p className="text-xl text-white">«Мы переходим в фазу открытого противостояния. Вы становитесь <span className="text-cyan-400">инженерами информационной войны</span>.»</p>
+                            <div className="grid grid-cols-2 gap-4 mt-8">
+                                <div className="border border-blue-500 bg-blue-900/20 p-6 rounded hover:bg-blue-900/30 transition-all">
+                                    <h3 className="text-3xl text-blue-400 font-black mb-2">BLUE TEAM</h3>
+                                    <p className="text-gray-300 font-bold">СТРОИТЕЛИ</p>
+                                    <p className="text-sm text-gray-400 mt-2">Миссия: Создать "витрину" вашего мира.</p>
+                                    <p className="text-xs text-blue-300 mt-4 border-t border-blue-800 pt-2">Оружие: HTML, CSS, GitHub</p>
+                                </div>
+                                <div className="border border-red-500 bg-red-900/20 p-6 rounded hover:bg-red-900/30 transition-all">
+                                    <h3 className="text-3xl text-red-400 font-black mb-2">RED TEAM</h3>
+                                    <p className="text-gray-300 font-bold">ИНЖЕНЕРЫ</p>
+                                    <p className="text-sm text-gray-400 mt-2">Миссия: Создать инструмент анализа правды.</p>
+                                    <p className="text-xs text-red-300 mt-4 border-t border-red-800 pt-2">Оружие: Python, API, No-code</p>
+                                </div>
+                            </div>
+                        </div>
+                    )
+                },
+                {
+                    id: 3,
+                    type: 'gemini_demo',
+                    header: 'ШАГ 1: ПРОЕКТИРОВАНИЕ',
+                    subHeader: 'МОЗГОВОЙ ШТУРМ С AI',
+                    desc: 'Используйте Gemini/Алису как архитектора. Выберите фракцию, чтобы увидеть пример работы.',
+                    blue: {
+                        task: 'Спроектировать структуру лендинга.',
+                        prompt: 'Роль: UX-архитектор. Придумай структуру сайта медиа.'
+                    },
+                    red: {
+                        task: 'Придумать 5 идей AI-инструментов.',
+                        prompt: 'Роль: Инженер R&D. 5 идей против фейков.'
+                    }
+                },
+                {
+                    id: 4,
+                    type: 'faction_tasks',
+                    header: 'ШАГ 2: ИССЛЕДОВАНИЕ (R&D)',
+                    subHeader: 'ПОИСК ТЕХНОЛОГИЙ',
+                    blue: {
+                        title: 'ВЫБОР ХОСТИНГА',
+                        points: ['Спросите AI: "Как задеплоить HTML бесплатно?"', 'Сравните: GitHub Pages vs Netlify.', 'Выбор: Где будет жить ваш сайт?']
+                    },
+                    red: {
+                        title: 'ВЫБОР СТЕКА',
+                        points: ['Промпт-Разведчик: "Как реализовать мою идею без кода?"', 'Промпт-Аналитик: "Сравни No-code vs Python".', 'Выбор: Glide, Replit или HTML+JS?']
+                    }
+                },
+                {
+                    id: 5,
+                    type: 'checkpoint',
+                    header: 'ЧЕКПОИНТ СЕССИИ 1',
+                    text: 'В ОБЩИЙ ЧАТ:',
+                    subText: 'BLUE TEAM: Выбранный хостинг.\nRED TEAM: Выбранный тех. стек.'
+                },
+                // --- SESSION 2 ---
+                {
+                    id: 6,
+                    type: 'section_header',
+                    session: 'ЗАНЯТИЕ 2 (90 МИН)',
+                    title: 'ПРОТОКОЛ "КОМПИЛЯЦИЯ"',
+                    desc: 'ХАКАТОН: КОДИНГ И ОТЛАДКА',
+                    color: 'text-green-400'
+                },
+                {
+                    id: 7,
+                    type: 'warning_interactive',
+                    header: 'ПРОТОКОЛ "АНТИ-ПАНИКА"',
+                    subHeader: 'ОШИБКИ — ЭТО ТОПЛИВО',
+                    content: (
+                        <div className="text-center">
+                            <div className="grid grid-cols-3 gap-4 mb-8">
+                                <div className="p-4 bg-gray-800 border border-gray-600 rounded">
+                                    <h4 className="text-red-400 font-bold">1. НЕ ПАНИКУЕМ</h4>
+                                    <p className="text-xs text-gray-400 mt-2">Красный текст ошибки — это просто инструкция к действию.</p>
+                                </div>
+                                <div className="p-4 bg-gray-800 border border-gray-600 rounded">
+                                    <h4 className="text-yellow-400 font-bold">2. КОПИРУЕМ</h4>
+                                    <p className="text-xs text-gray-400 mt-2">Скриншот или текст ошибки &rarr; отправляем в AI.</p>
+                                </div>
+                                <div className="p-4 bg-gray-800 border border-gray-600 rounded">
+                                    <h4 className="text-green-400 font-bold">3. СПРАШИВАЕМ</h4>
+                                    <p className="text-xs text-gray-400 mt-2">"Что это значит и как исправить?"</p>
+                                </div>
+                            </div>
+                        </div>
+                    )
+                },
+                {
+                    id: 8,
+                    type: 'gemini_demo',
+                    specialType: 'debug',
+                    header: 'СИМУЛЯТОР ОТЛАДКИ',
+                    subHeader: 'КАК РАБОТАТЬ С ОШИБКАМИ',
+                    desc: 'Представьте: ваш код не работает, консоль красная. Что делать? Смотрите пример.',
+                    blue: { task: 'DEBUG MODE ACTIVATED', prompt: 'Fix Error' },
+                    red: { task: 'DEBUG MODE ACTIVATED', prompt: 'Fix Error' }
+                },
+                {
+                    id: 9,
+                    type: 'faction_tasks',
+                    header: 'ЗАДАЧИ ХАКАТОНА',
+                    subHeader: '65 МИНУТ СПРИНТА',
+                    blue: {
+                        title: 'СБОРКА САЙТА',
+                        points: ['1. Генерация HTML/CSS по ТЗ (25 мин).', '2. Создание репозитория GitHub (25 мин).', '3. Деплой и тест на мобильном (15 мин).']
+                    },
+                    red: {
+                        title: 'СБОРКА ПРОТОТИПА',
+                        points: ['1. Настройка среды (Replit/Glide) (15 мин).', '2. Базовая логика/интерфейс (20 мин).', '3. Интеграция "мозга" и отладка (30 мин).']
+                    }
+                },
+                {
+                    id: 10,
+                    type: 'checkpoint',
+                    header: 'ЧЕКПОИНТ СЕССИИ 2',
+                    text: 'В СЕТКУ (IN2040.RU):',
+                    subText: 'Опубликовать ссылку на работающий прототип.\nДаже если он кривой. Если он работает — это победа.'
+                },
+                // --- SESSION 3 ---
+                {
+                    id: 11,
+                    type: 'section_header',
+                    session: 'ЗАНЯТИЕ 3 (90 МИН)',
+                    title: 'ПРОТОКОЛ "ВЕРДИКТ"',
+                    desc: 'ПИТЧИНГ И БАТТЛ ПРОДУКТОВ',
+                    color: 'text-purple-400'
+                },
+                {
+                    id: 12,
+                    type: 'content',
+                    header: 'СТРУКТУРА ПИТЧА',
+                    subHeader: '5 МИНУТ НА ЗАЩИТУ',
+                    content: (
+                        <div className="bg-black/40 p-6 rounded border border-purple-500">
+                            <ul className="space-y-6">
+                                <li className="flex gap-4 items-start">
+                                    <span className="bg-purple-900 text-purple-400 px-3 py-1 rounded font-bold font-mono">01</span>
